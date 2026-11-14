@@ -1,0 +1,18 @@
+{
+  "/catalog": {
+    "file": "catalog.json",
+    "mediaType": "application/json"
+  },
+  "/objects/r1": {
+    "file": "r1.json",
+    "mediaType": "application/json"
+  },
+  "/objects/r2": {
+    "file": "r2.json",
+    "mediaType": "application/json"
+  },
+  "/objects/r3": {
+    "file": "r3.json",
+    "mediaType": "application/json"
+  }
+}
