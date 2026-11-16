@@ -9,3 +9,5 @@ GET /collections 返回资料集列表，GET /collections/{collectionId} 返回 
 POST /collections/{collectionId}/records 可录入人工确认记录，必须附本资料集的真实收件出处。自动接入不能依赖操作者事先写入答案。该接口目前采用同键不可变约定；新增版本、历史记录与当前视图如何协调，应与来源语义相符，不能覆盖已归档原文。来源契约中的值是查询视图契约，不限定解析器、状态机或索引的内部实现。
 
 本地 provider 是独立 HTTP 来源，fixtures 为合成的公开样本，不包含真实个人或机构凭据。fixtures/descriptor.json 说明来源入口与接入选项。多数资料源用 /deliveries 声明 deliveryId、revision、roots 和 resources；roots 是需处理的独立入口，resources 是同包可领取资源，不是公网搜索指令。文件可用 GET、HEAD 与单段 Range 读取；ETag 表示返回字节的身份。SOURCE_STAGE=partial 启动不完整交付状态，完整状态是默认值。来源服务不接受写操作。
+
+逐页作业与跨环境移交的完整契约见 docs/source-contract.md。POST /jobs/{id}/export 输出自校验进度包并把旧作业围栏为 handed-off；POST /jobs/import 接受 bundle、source、actor，先校验后接管，带 verify:true 时只返回适用性核对结论（200，不落地、不改变来源资格），正式导入成功为201。进度包内原文字节、收件元数据与出处可经 GET /receipts/{receiptId} 与 GET /receipts/{receiptId}/body 在新环境逐一回查。

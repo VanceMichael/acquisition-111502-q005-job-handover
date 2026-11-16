@@ -27,7 +27,7 @@ npm run acceptance:structured
 npm run acceptance:partial
 ```
 
-这两项检查分别读取完整与不完整来源样本，核对 docs/source-contract.md 中的结构化记录与出处关系。当前版本未提供自动解释，因此此命令会明确报告缺少记录；它不是现有原始收件功能的通过条件。完整支持范围及人工接口见 docs/service-api.md 和 docs/source-contract.md。
+这两项检查分别在完整与不完整来源样本下，用两套独立归档目录与真实来源资格接口演练跨环境移交：导出进度包、确认包内不含会话凭据与临时游标、新环境接管、旧实例围栏、重复导入仲裁，并核对最终 collected-item 与出处回查。两项检查当前均应成功退出；结构化自动解释的观察（expected-observations）仍保持为空，现有原始收件与人工接口不受影响。完整支持范围及人工接口见 docs/service-api.md 和 docs/source-contract.md。
 
 ## 可复现环境
 
@@ -39,4 +39,10 @@ docker run --rm --network=none local-receiver npm run demo
 
 Dockerfile 固定 Linux Node 镜像摘要，容器仅需内部回环网络。镜像构建不安装额外依赖，也不读取真实账户、用户数据或公共网站；首次拉取基础镜像属于环境准备，不属于正式运行。脚本输出规模受小型本地资料控制，正常完整运行可以在九十秒内观察。
 
-现有逐页作业可通过 /jobs、/jobs/{id}/advance 使用，具体请求字段见来源契约；跨环境移交尚未开放。check:structured 和 check:partial 使用两套独立归档目录与真实来源资格接口，不把同目录重启冒充跨环境移交。
+现有逐页作业可通过 /jobs、/jobs/{id}/advance 使用，具体请求字段见来源契约；跨环境移交通过 /jobs/{id}/export 与 /jobs/import 完成，进度包自带完整性校验与待领范围，支持 verify:true 先核对后接管。check:structured 和 check:partial 使用两套独立归档目录与真实来源资格接口，不把同目录重启冒充跨环境移交。
+
+## 作业移交
+
+维护窗口迁移未收完的作业时，不再复制工作目录（目录内含会话凭据与只对旧领取者有效的游标）。旧环境 POST /jobs/{id}/export 会先等在途页面落盘，再把作业持久化为 handed-off 围栏并输出进度包：包含全部已收件原文、收件出处、collected-item 记录、逻辑来源身份与待领范围，不含 sessionToken、临时游标或本机路径。围栏后旧进程即使重启，advance 也返回409，迟到响应无法再发表结果。
+
+新环境先 POST /jobs/import 并带 verify:true 核对包完整性、logicalSourceId 与来源当前代次，确认 `importable` 与继续水位后，再去掉 verify 正式导入：服务复原原文与出处，向来源按代次 CAS 取得接管资格并重新 /open 会话。同一进度包重复导入只有一个有效接管者，后者收到409；恢复时重叠页内已确认条目自动跳过，不产生重复资料。核对失败（改动、缺件、逻辑来源不符）在主张资格之前拒绝，不落地任何内容。

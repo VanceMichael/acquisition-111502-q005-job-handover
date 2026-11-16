@@ -124,4 +124,61 @@ export class Archive {
   async list() {
     return (await readdir(join(this.directory, 'collections'))).filter(name => name.endsWith('.json')).map(name => name.slice(0, -5));
   }
+
+  /**
+   * 将进度包内的原文与收件落入新归档。只在目标资料集不存在时创建，
+   * 或与同一进度包的先前落地完全一致时幂等返回；冲突绝不覆盖。
+   * 这样资格主张失败后的重试不会被半截落地卡死，也不会重写旧原文。
+   */
+  async restoreBundle(archiveSection) {
+    identifier(archiveSection.collectionId);
+    return this.serialized(async () => {
+      const collectionPath = join(this.directory, 'collections', archiveSection.collectionId + '.json');
+      const targetCollection = {
+        collectionId: archiveSection.collectionId,
+        receiptIds: [...archiveSection.receiptIds],
+        records: archiveSection.records,
+        issues: archiveSection.issues
+      };
+      const previous = await readFile(collectionPath, 'utf8').then(value => JSON.parse(value), error => {
+        if (error.code === 'ENOENT') return null;
+        throw error;
+      });
+      if (previous) {
+        if (JSON.stringify(previous) !== JSON.stringify(targetCollection)) {
+          throw Object.assign(new Error('collection_already_exists'), { status: 409 });
+        }
+        for (const entry of archiveSection.entries) {
+          const receipt = JSON.parse(await readFile(join(this.directory, 'receipts', entry.receiptId + '.json'), 'utf8'));
+          if (JSON.stringify(receipt) !== JSON.stringify(entry.receipt)) {
+            throw Object.assign(new Error('receipt_identity_conflict'), { status: 409 });
+          }
+        }
+        return previous;
+      }
+      for (const entry of archiveSection.entries) {
+        const receiptPath = join(this.directory, 'receipts', entry.receiptId + '.json');
+        const existing = await readFile(receiptPath, 'utf8').then(value => JSON.parse(value), error => {
+          if (error.code === 'ENOENT') return null;
+          throw error;
+        });
+        if (existing) {
+          if (JSON.stringify(existing) !== JSON.stringify(entry.receipt)) {
+            throw Object.assign(new Error('receipt_identity_conflict'), { status: 409 });
+          }
+        } else {
+          const bytes = Buffer.from(entry.contentBase64, 'base64');
+          if (digest(bytes) !== entry.receipt.sha256) {
+            throw Object.assign(new Error('bundle_byte_mismatch'), { status: 400 });
+          }
+          await writeFile(join(this.directory, 'blobs', entry.receipt.sha256), bytes, { flag: 'wx' }).catch(error => {
+            if (error.code !== 'EEXIST') throw error;
+          });
+          await this.saveJson(receiptPath, entry.receipt);
+        }
+      }
+      await this.saveJson(collectionPath, targetCollection);
+      return targetCollection;
+    });
+  }
 }

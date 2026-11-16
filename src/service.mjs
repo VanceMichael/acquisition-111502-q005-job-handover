@@ -32,10 +32,17 @@ export async function createService({ directory, allowedOrigin }) {
     try {
       const url = new URL(request.url, 'http://localhost');
       if (request.method === 'POST' && url.pathname === '/jobs') return json(response, 202, await jobs.start(await requestBody(request)));
+      if (request.method === 'POST' && url.pathname === '/jobs/import') {
+        const body = await requestBody(request);
+        const result = await jobs.importJob({ bundle: body.bundle, source: body.source, actor: body.actor, verifyOnly: body.verify === true });
+        return json(response, body.verify === true ? 200 : 201, result);
+      }
       const job = url.pathname.match(/^\/jobs\/([a-zA-Z0-9_.-]+)$/);
       if (job && request.method === 'GET') return json(response, 200, await jobs.read(job[1]));
       const advance = url.pathname.match(/^\/jobs\/([a-zA-Z0-9_.-]+)\/advance$/);
       if (advance && request.method === 'POST') return json(response, 200, await jobs.advance(advance[1]));
+      const exportJob = url.pathname.match(/^\/jobs\/([a-zA-Z0-9_.-]+)\/export$/);
+      if (exportJob && request.method === 'POST') return json(response, 200, await jobs.exportJob(exportJob[1]));
       if (request.method === 'GET' && url.pathname === '/health') return json(response, 200, { status: 'ok' });
       if (request.method === 'GET' && url.pathname === '/collections') return json(response, 200, await archive.list());
       const collection = url.pathname.match(/^\/collections\/([a-zA-Z0-9_.-]+)$/);
