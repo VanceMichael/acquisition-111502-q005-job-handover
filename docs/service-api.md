@@ -9,3 +9,9 @@ GET /collections 返回资料集列表，GET /collections/{collectionId} 返回 
 POST /collections/{collectionId}/records 可录入人工确认记录，必须附本资料集的真实收件出处。自动接入不能依赖操作者事先写入答案。该接口目前采用同键不可变约定；新增版本、历史记录与当前视图如何协调，应与来源语义相符，不能覆盖已归档原文。来源契约中的值是查询视图契约，不限定解析器、状态机或索引的内部实现。
 
 本地 provider 是独立 HTTP 来源，fixtures 为合成的公开样本，不包含真实个人或机构凭据。fixtures/descriptor.json 说明来源入口与接入选项。多数资料源用 /deliveries 声明 deliveryId、revision、roots 和 resources；roots 是需处理的独立入口，resources 是同包可领取资源，不是公网搜索指令。文件可用 GET、HEAD 与单段 Range 读取；ETag 表示返回字节的身份。SOURCE_STAGE=partial 启动不完整交付状态，完整状态是默认值。来源服务不接受写操作。
+
+## 作业移交接口
+
+POST /jobs/{id}/export 在作业串行队列上建立持久移交边界（进行中的一页先排空落盘），返回 transferId 与自校验 bundle。bundle 携带原文字节、receipts、records、provenance、lastCommitted 水位与 logicalSourceId，不含 sessionToken、临时 cursor 或绝对路径；完整性链与包结构见 source-contract.md。导出后旧实例的 advance 恒返回409，重启不改变该栅栏。
+
+POST /jobs/import 接受 bundle、source、actor，先校验完整性链与 logicalSourceId（逻辑来源不符409、非授权 origin 403、包被改动或缺件400），再向来源做 ownership 代次 CAS 取得接管资格；同包被其他 actor 接管后再导入409，同 actor 重放返回201并带 duplicate 标记。导入响应回传 jobId、transferId、resumeAfter、logicalSourceId 与恢复计数，供运维核对包是否完整、是否仍适用于该来源，以及明确从哪一段继续。新实例首次 advance 按 resumeAfter 重开会话，重叠条目幂等跳过。

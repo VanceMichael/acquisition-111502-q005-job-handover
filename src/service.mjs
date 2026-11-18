@@ -36,6 +36,12 @@ export async function createService({ directory, allowedOrigin }) {
       if (job && request.method === 'GET') return json(response, 200, await jobs.read(job[1]));
       const advance = url.pathname.match(/^\/jobs\/([a-zA-Z0-9_.-]+)\/advance$/);
       if (advance && request.method === 'POST') return json(response, 200, await jobs.advance(advance[1]));
+      const exportJob = url.pathname.match(/^\/jobs\/([a-zA-Z0-9_.-]+)\/export$/);
+      if (exportJob && request.method === 'POST') return json(response, 200, await jobs.export(exportJob[1]));
+      if (request.method === 'POST' && url.pathname === '/jobs/import') {
+        const imported = await jobs.import(await requestBody(request));
+        return json(response, imported.status || 201, imported);
+      }
       if (request.method === 'GET' && url.pathname === '/health') return json(response, 200, { status: 'ok' });
       if (request.method === 'GET' && url.pathname === '/collections') return json(response, 200, await archive.list());
       const collection = url.pathname.match(/^\/collections\/([a-zA-Z0-9_.-]+)$/);

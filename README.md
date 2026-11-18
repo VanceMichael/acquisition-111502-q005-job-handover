@@ -39,4 +39,4 @@ docker run --rm --network=none local-receiver npm run demo
 
 Dockerfile 固定 Linux Node 镜像摘要，容器仅需内部回环网络。镜像构建不安装额外依赖，也不读取真实账户、用户数据或公共网站；首次拉取基础镜像属于环境准备，不属于正式运行。脚本输出规模受小型本地资料控制，正常完整运行可以在九十秒内观察。
 
-现有逐页作业可通过 /jobs、/jobs/{id}/advance 使用，具体请求字段见来源契约；跨环境移交尚未开放。check:structured 和 check:partial 使用两套独立归档目录与真实来源资格接口，不把同目录重启冒充跨环境移交。
+逐页作业可通过 /jobs、/jobs/{id}/advance 使用，具体请求字段见来源契约。跨环境移交使用 POST /jobs/{id}/export 与 POST /jobs/import：导出先排空进行中的一页并落下持久栅栏，进度包携带原文字节、收件、出处、水位与 logicalSourceId 的完整校验链，临时游标与会话凭据不离开原环境；导入先验包再向来源取得新代次资格，同包重复接管返回409，新实例按水位续领且重叠补领幂等。check:structured 和 check:partial 使用两套独立归档目录与真实来源资格接口验证这条移交链路，不把同目录重启冒充跨环境移交。

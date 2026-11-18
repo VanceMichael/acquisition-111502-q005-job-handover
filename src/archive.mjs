@@ -121,6 +121,40 @@ export class Archive {
     });
   }
 
+  // 按进度包原样恢复原文字节、收件与记录。所有写入均为幂等：同包重复导入或
+  // 与本机既有内容重合时不产生重复资料，字节与身份冲突仍显式报错。
+  async restoreBundle(bundle) {
+    return this.serialized(async () => {
+      const collectionId = identifier(bundle.job.jobId);
+      for (const blob of bundle.blobs) {
+        await writeFile(join(this.directory, 'blobs', blob.sha256), Buffer.from(blob.contentBase64, 'base64'), { flag: 'wx' })
+          .catch(error => { if (error.code !== 'EEXIST') throw error; });
+      }
+      for (const receipt of bundle.receipts) {
+        if (receipt.collectionId !== collectionId) throw Object.assign(new Error('provenance_scope'), { status: 400 });
+        const path = join(this.directory, 'receipts', receipt.receiptId + '.json');
+        try {
+          const existing = JSON.parse(await readFile(path, 'utf8'));
+          if (existing.sha256 !== receipt.sha256) throw Object.assign(new Error('revision_content_conflict'), { status: 409 });
+        } catch (error) {
+          if (error.code !== 'ENOENT') throw error;
+          await this.saveJson(path, receipt);
+        }
+      }
+      const collection = await this.collection(collectionId);
+      for (const receiptId of bundle.collection.receiptIds) {
+        if (!collection.receiptIds.includes(receiptId)) collection.receiptIds.push(receiptId);
+      }
+      for (const record of bundle.records) {
+        if (!collection.records.some(existing => existing.kind === record.kind && existing.key === record.key)) {
+          collection.records.push(record);
+        }
+      }
+      await this.saveJson(join(this.directory, 'collections', collectionId + '.json'), collection);
+      return { collectionId, receiptIds: [...collection.receiptIds], records: collection.records.length };
+    });
+  }
+
   async list() {
     return (await readdir(join(this.directory, 'collections'))).filter(name => name.endsWith('.json')).map(name => name.slice(0, -5));
   }
